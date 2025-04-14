@@ -11,40 +11,30 @@ library(MuMIn)
 # set wd
 setwd("C:/Users/enara681/Desktop")
 
-# import data
-life <- read.csv2("life.csv")
-
-# delete one sample from Vanessa to obtain balanced design
-life <- life[-149, ]
-
-# estimation of sample size ----
+# import trial data
+trial <- read.csv2("trial_survey.csv")
 
 # create subset man
-man <- life %>% 
+sub_man <- trial %>% 
   filter(Gender == "M")
 
 # create subset woman
-woman <- life %>% 
+sub_woman <- trial %>% 
   filter(Gender == "F")
 
-# create random subset of samples for power analysis
-set.seed(14)
-sub_man <- man[sample(nrow(man), 30), ]
-sub_woman <- woman[sample(nrow(woman), 30), ]
-
 # means
-mean1 <- mean(sub_man$Age) # 77.46667
-mean2 <- mean(sub_woman$Age) # 78.5
+mean1 <- mean(sub_man$Age) 
+mean2 <- mean(sub_woman$Age)
 
 # sd
-sd1 <- sd(sub_man$Age) # 11.21
-sd2 <- sd(sub_woman$Age) # 8.48
+sd1 <- sd(sub_man$Age) 
+sd2 <- sd(sub_woman$Age) 
 
 # calculate pooled sd
-s_pooled <- sqrt( ((30 - 1) * sd1^2 + (30 - 1) * sd2^2) / (30 + 30 - 2) )
+sd_pool <- sqrt( ((30 - 1) * sd1^2 + (30 - 1) * sd2^2) / (30 + 30 - 2) )
 
-# effect size d
-d <- abs(mean1 - mean2) / s_pooled
+# calculate effect size d
+d <- abs(mean1 - mean2) / sd_pool
 
 # power analysis
 power.t.test(power = 0.85,        # power needed according to Prof. Wolinska
@@ -54,20 +44,48 @@ power.t.test(power = 0.85,        # power needed according to Prof. Wolinska
              type = "two.sample", 
              alternative = "one.sided") 
 
-# ~ 54 samples needed
-# 90 samples left in our data set (45 women and 45 men)
-
-# remove samples used for power analysis from the original data set:
-
-# identify samples
-ids_to_remove <- unique(c(sub_man$Sample_ID, sub_woman$Sample_ID))
-
-# exclude samples from dataset
-life <- life %>%
-  filter(!Sample_ID %in% ids_to_remove) # 90 observations left
-
+# ~ 43 samples in each group needed
 
 # analysis ----
+
+# import data
+life <- read.csv2("life.csv") # 75 samples per group
+
+# data exploration
+
+# boxplots
+
+# sealed surfaces
+ggplot(life, mapping = aes(x = Gender, y = Age,
+                             color = factor(Gender)))+
+  geom_boxplot(notch = T)+
+  geom_point(position=position_jitter(), alpha = 0.7, size = 2)+
+  scale_x_discrete(breaks = c(0, 1))+
+  scale_color_manual(values = c("F" = "#457983", "M" = "#cf3759"))+
+  theme_bw()+
+  theme(legend.position = "none") # difficult to interpret
+
+# distributions of men 
+sub_man <- life %>% 
+  filter(Gender == "M")
+
+ggplot(sub_man, aes(x = Age)) +
+  geom_histogram(binwidth = 5, fill = "#7FFFD4", alpha = 0.7) +
+  labs(title = "Distribution of lifespan for men",
+    x = "Age",
+       y = "Frequency") +
+  theme_bw() # very skewed
+
+# distribution of women
+sub_woman <- life %>% 
+  filter(Gender == "F")
+
+ggplot(sub_woman, aes(x = Age)) +
+  geom_histogram(binwidth = 5, fill = "#7FFFD4", alpha = 0.7) +
+  labs(title = "Distribution of lifespan for women",
+    x = "Age",
+       y = "Frequency") +
+  theme_bw() # very skewed
 
 # analyse the effect of sex on age with cementry as a random effect
 
@@ -82,14 +100,14 @@ summary(life_mod)
 VarCorr(life_mod)
 
 # calculate R² (marginal and conditional)
-r2 <- r.squaredGLMM(life_mod)
+r2 <- MuMIn::r.squaredGLMM(life_mod)
 print(r2) # very low
 
 # p value adjustment since the default gives out p for two-sided t test
-0.0247*0.5 # 0.0124
+0.0065*0.5 # 0.00325
 
 # double check with a normal one-sided t test
-t.test(Age ~ Gender, data = life, alternative = "greater") # 0.012
+t.test(Age ~ Gender, data = life, alternative = "greater") # 0.003
 
 
 # model diagnostics ----
@@ -102,7 +120,7 @@ qqnorm(resid(life_mod))
 qqline(resid(life_mod, col = "red"))# still OK
        
 # histogram of residuals
-hist(resid(life_mod)) # looks Ok
+hist(resid(life_mod)) # looks OK
 
 hist(life$Age)
 
@@ -116,8 +134,8 @@ men <- life %>%
 women <- life %>% 
   filter(Gender == "F")
 
-mean(men$Age) # 68.33
-mean(women$Age) # 75.96
+mean(men$Age) 
+mean(women$Age) 
 
 # standard error (SE = SD / sqrt(n))
 sd_men <- sd(men$Age)
